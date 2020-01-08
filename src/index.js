@@ -26,66 +26,30 @@ const workerLoader = path.resolve(__dirname, 'loader.js');
 export default class WorkerPlugin {
   constructor (options) {
     this.options = options || {};
+    this.instantiationsFound = false
     this[WORKER_PLUGIN_SYMBOL] = true;
   }
 
   apply (compiler) {
-    let workerId = 0;
-
     compiler.hooks.normalModuleFactory.tap(NAME, factory => {
+      this.workerId = 0;
+
       for (const type of JS_TYPES) {
         factory.hooks.parser.for(`javascript/${type}`).tap(NAME, parser => {
+          parser.hooks.new.for('Worker').tap(NAME, expr => {
+            return this.processInstantiation(parser, expr);
+          });
           parser.hooks.new.for('imported var').tap(NAME, expr => {
             if (expr.callee.name !== 'Worker') return false
 
-            const dep = parser.evaluateExpression(expr.arguments[0]);
-
-            if (!dep.isString()) {
-              parser.state.module.warnings.push({
-                message: 'new Worker() will only be bundled if passed a String.'
-              });
-              return false;
-            }
-            if (/^(https?:)?\/\//i.test(dep.string)) {
-              // Ignore absolute URL workers
-              return false;
-            }
-
-            const optsExpr = expr.arguments[1];
-            let typeModuleExpr = Types.objectProperty(
-              Types.identifier("type"),
-              Types.stringLiteral("module")
-            )
-            typeModuleExpr.range=[0, 0]
-
-            let opts = {};
-            if (optsExpr) {
-              opts = {};
-              for (let i = optsExpr.properties.length; i--;) {
-                const prop = optsExpr.properties[i];
-                if (prop.type === 'Property' && !prop.computed && !prop.shorthand && !prop.method) {
-                  opts[prop.key.name] = parser.evaluateExpression(prop.value).string;
-
-                  if (prop.key.name === 'type') {
-                    typeModuleExpr = prop;
-                  }
-                }
-              }
-            }
-
-            const loaderOptions = { name: opts.name || workerId + '' };
-            const req = `require(${JSON.stringify(workerLoader + '?' + JSON.stringify(loaderOptions) + '!' + dep.string)})`;
-            const id = `__webpack__worker__${workerId++}`;
-            ParserHelpers.toConstantDependency(parser, id)(expr.arguments[0]);
-
-            ParserHelpers.addParsedVariableToModule(parser, id, req);
+            return this.processInstantiation(parser, expr);
           });
         });
       }
     });
 
     compiler.hooks.afterCompile.tap(NAME, compilation => {
-      if (workerId === 0) {
+      if (!this.instantiationsFound) {
         compilation.warnings.push({
           message:
             'No instantiations of threads.js workers found.\n' +
@@ -96,5 +60,60 @@ export default class WorkerPlugin {
         })
       }
     })
+  }
+
+  processInstantiation (parser, expr) {
+    const dep = parser.evaluateExpression(expr.arguments[0]);
+
+    if (!dep.isString()) {
+      parser.state.module.warnings.push({
+        message: 'new Worker() will only be bundled if passed a String.'
+      });
+      return false;
+    }
+    if (/^(https?:)?\/\//i.test(dep.string)) {
+      // Ignore absolute URL workers
+      return false;
+    }
+
+    const optsExpr = expr.arguments[1];
+    let typeModuleExpr = Types.objectProperty(
+      Types.identifier("type"),
+      Types.stringLiteral("module")
+    )
+    typeModuleExpr.range = [0, 0]
+
+    let opts = {};
+    if (optsExpr) {
+      opts = {};
+      for (let i = optsExpr.properties.length; i--;) {
+        const prop = optsExpr.properties[i];
+        if (prop.type === 'Property' && !prop.computed && !prop.shorthand && !prop.method) {
+          opts[prop.key.name] = parser.evaluateExpression(prop.value).string;
+
+          if (prop.key.name === 'type') {
+            typeModuleExpr = prop;
+          }
+        }
+      }
+    }
+
+    const loaderOptions = { name: opts.name || this.workerId + '' };
+    const req = `require(${JSON.stringify(workerLoader + '?' + JSON.stringify(loaderOptions) + '!' + dep.string)})`;
+    const id = `__webpack__worker__${this.workerId++}`;
+    ParserHelpers.toConstantDependency(parser, id)(expr.arguments[0]);
+
+    if (typeModuleExpr && this.options.workerType) {
+      ParserHelpers.toConstantDependency(parser, JSON.stringify(this.options.workerType))(typeModuleExpr.value);
+    } else if (typeModuleExpr && this.options.preserveTypeModule !== true) {
+      // Options object can contain comma at the end e.g. `{ type: 'module', }`.
+      // Previously, `type` property was replaced with an empty string
+      // that left this comma.
+      // Currently the `type` property value is replaced with `undefined`.
+      ParserHelpers.toConstantDependency(parser, 'type:undefined')(typeModuleExpr);
+    }
+
+    this.instantiationsFound = true;
+    return ParserHelpers.addParsedVariableToModule(parser, id, req);
   }
 }
