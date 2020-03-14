@@ -18,6 +18,7 @@ import loaderUtils from 'loader-utils';
 import SingleEntryPlugin from 'webpack/lib/SingleEntryPlugin';
 import WebWorkerTemplatePlugin from 'webpack/lib/webworker/WebWorkerTemplatePlugin';
 import FetchCompileWasmTemplatePlugin from 'webpack/lib/web/FetchCompileWasmTemplatePlugin';
+import NodeTargetPlugin from 'webpack/lib/node/NodeTargetPlugin';
 import WORKER_PLUGIN_SYMBOL from './symbol';
 
 const NAME = 'WorkerPluginLoader';
@@ -57,6 +58,9 @@ export function pitch (request) {
 
   const workerCompiler = this._compilation.createChildCompiler(NAME, workerOptions, plugins);
   workerCompiler.context = this._compiler.context;
+  if (pluginOptions.target === "electron-node-worker") {
+    new NodeTargetPlugin().apply(workerCompiler);
+  }
   (new WebWorkerTemplatePlugin(workerOptions)).apply(workerCompiler);
   (new FetchCompileWasmTemplatePlugin({
     mangleImports: compilerOptions.optimization.mangleWasmImports

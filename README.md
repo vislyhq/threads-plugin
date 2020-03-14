@@ -100,6 +100,11 @@ When using TypeScript, make sure this setting is part of your TypeScript configu
 }
 ```
 
+## Electron
+
+To use standard Node packages in Electron web workers, make sure Node integration in workers is [turned on](https://www.electronjs.org/docs/tutorial/multithreading)
+and the plugin option [target](#target) is set to `electron-node-worker`.
+
 ## Options
 
 In most cases, no options are necessary to use WorkerPlugin.
@@ -151,6 +156,23 @@ module.exports = {
   ]
   <...>
 }
+```
+
+### `target` 
+
+Due to the way webpack works, it may be necessary to change the target environment of the workers.
+
+Possible values:
+
+- `electron-node-worker` use this if you are using Electron and compiling web workers that have node integration enabled. See [Electron Multithreading](https://www.electronjs.org/docs/tutorial/multithreading).
+
+Default value: `undefined`
+
+Example with electron node workers:
+```js
+new ThreadsPlugin({
+  target: 'electron-node-worker'
+})
 ```
 
 ## License
