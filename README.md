@@ -160,13 +160,11 @@ module.exports = {
 
 ### `target` 
 
-Due to the way webpack works, it may be necessary to change the target environment of the workers.
+Due to the way webpack works, it may be necessary to change the target environment of the workers. Using this option you can override webpack's [`target` option](https://webpack.js.org/configuration/target/#root) just for the worker bundle. Defaults to the global webpack `target`.
 
-Possible values:
+Frequently used values:
 
-- `electron-node-worker` use this if you are using Electron and compiling web workers that have node integration enabled. See [Electron Multithreading](https://www.electronjs.org/docs/tutorial/multithreading).
-
-Default value: `undefined`
+- `electron-node-worker`: use this if you are using Electron and compiling web workers that have node integration enabled. See [Electron Multithreading](https://www.electronjs.org/docs/tutorial/multithreading).
 
 Example with electron node workers:
 ```js
