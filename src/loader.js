@@ -59,7 +59,7 @@ export function pitch (request) {
   const workerCompiler = this._compilation.createChildCompiler(NAME, workerOptions, plugins);
   workerCompiler.context = this._compiler.context;
 
-  const target = pluginOptions.target || compilerOptions.target
+  const target = pluginOptions.target || compilerOptions.target;
 
   if (target && /\bnode\b/.test(target)) {
     new NodeTargetPlugin().apply(workerCompiler);
@@ -85,7 +85,12 @@ export function pitch (request) {
     const entry = entries && entries[0] && entries[0].files[0];
     if (!err && !entry) err = Error(`WorkerPlugin: no entry for ${request}`);
     if (err) return cb(err);
-    return cb(null, `module.exports = __webpack_public_path__ + ${JSON.stringify(entry)}`);
+    const stringEntry = JSON.stringify(
+      (pluginOptions.stripEntryPrefix && entry.startsWith(pluginOptions.stripEntryPrefix))
+        ? entry.substr(pluginOptions.stripEntryPrefix.length)
+        : entry
+    );
+    return cb(null, `module.exports = __webpack_public_path__ + ${stringEntry}`);
   });
 };
 
